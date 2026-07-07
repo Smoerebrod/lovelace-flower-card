@@ -23,7 +23,7 @@ describe('selectCareInfo', () => {
     const result = selectCareInfo(attrs, ['care_watering', 'care_fertilization']);
     expect(result.map(e => e.key)).toEqual(['care_watering', 'care_fertilization']);
     expect(result[0].text).toBe('Water weekly.');
-    expect(result[0].label).toBe('Watering');
+    expect(result[0].label).toBe('Gießen');
     expect(result[0].icon).toBe('mdi:watering-can-outline');
   });
 

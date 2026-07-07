@@ -46,6 +46,39 @@ export default class FlowerCard extends LitElement {
 
     private stateObj: HomeAssistantEntity | undefined;
     private previousFetchDate = 0;
+    private _careHideTimer: ReturnType<typeof setTimeout> | undefined;
+
+    /**
+     * Care info visibility, controlled via the `care-visible` class on the
+     * host (survives Lit re-renders; see :host(.care-visible) in styles.ts).
+     * Mouse: hover shows/hides. Touch/pen: tap toggles, auto-hide after 5 s.
+     * The two paths are strictly separated by pointerType so a mouse click
+     * cannot undo what hover just did, and a touch tap is not affected by
+     * the synthetic enter/leave events some browsers emit.
+     */
+    private _onCareToggleClick = (e: Event): void => {
+        e.stopPropagation();
+        if ((e as PointerEvent).pointerType === 'mouse') return;
+        if (this._careHideTimer !== undefined) {
+            clearTimeout(this._careHideTimer);
+            this._careHideTimer = undefined;
+        }
+        this.classList.toggle('care-visible');
+        if (this.classList.contains('care-visible')) {
+            this._careHideTimer = setTimeout(() => {
+                this.classList.remove('care-visible');
+                this._careHideTimer = undefined;
+            }, 5000);
+        }
+    };
+
+    private _onCareToggleEnter = (e: PointerEvent): void => {
+        if (e.pointerType === 'mouse') this.classList.add('care-visible');
+    };
+
+    private _onCareToggleLeave = (e: PointerEvent): void => {
+        if (e.pointerType === 'mouse') this.classList.remove('care-visible');
+    };
     private _lastEntityPicture: string | undefined;
     private _resolvedImageUrl: string | undefined;
 
@@ -135,6 +168,17 @@ export default class FlowerCard extends LitElement {
                 {
                     type: "expandable",
                     name: "",
+                    title: "Warn-Zonen",
+                    schema: [
+                        { name: "moisture_warn_auto", selector: { boolean: {} } },
+                        { name: "humidity_warn_auto", selector: { boolean: {} } },
+                        { name: "temperature_warn_auto", selector: { boolean: {} } },
+                        { name: "conductivity_warn_auto", selector: { boolean: {} } }
+                    ]
+                },
+                {
+                    type: "expandable",
+                    name: "",
                     title: "Appearance",
                     schema: [
                         {
@@ -173,7 +217,11 @@ export default class FlowerCard extends LitElement {
                     show_care: "Show Care Info",
                     hide_species: "Hide Species",
                     hide_image: "Hide Image",
-                    hide_units: "Hide Units"
+                    hide_units: "Hide Units",
+                    moisture_warn_auto: "Bodenfeuchtigkeit",
+                    humidity_warn_auto: "Luftfeuchtigkeit",
+                    temperature_warn_auto: "Temperatur",
+                    conductivity_warn_auto: "EC / Leitfähigkeit"
                 };
                 return labels[schema.name] || schema.name;
             }
@@ -241,7 +289,10 @@ export default class FlowerCard extends LitElement {
                 : ""
             }"></ha-icon>
                 </span>
-                <span id="battery">${renderExtraBadges(this)}${renderBattery(this)}</span>
+                <span id="battery">${this.config.show_care?.length ? html`<span id="care-toggle" title="Care Info"
+                    @click="${this._onCareToggleClick}"
+                    @pointerenter="${this._onCareToggleEnter}"
+                    @pointerleave="${this._onCareToggleLeave}">&#8505;</span>` : ''}${renderExtraBadges(this)}${renderBattery(this)}</span>
                 ${!hideSpecies ? html`<span id="species">${species}</span>` : ''}
             </div>
             <div class="divider"></div>

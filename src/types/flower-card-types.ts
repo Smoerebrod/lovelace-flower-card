@@ -12,9 +12,22 @@ export interface ExtraBadge {
     show_state?: boolean; // Show state value next to icon (default: false)
 }
 
+export interface WarnZones {
+    warn?: number;             // manual warn threshold in the sensor's unit; always wins over auto
+}
+
 export interface FlowerCardConfig extends LovelaceCardConfig {
     entity?: string;
     battery_sensor?: string;
+    // Warn zones (4-zone bars). Manual value beats auto toggle; see utils/warnZones.ts.
+    moisture_zones?: WarnZones;
+    humidity_zones?: WarnZones;
+    temperature_zones?: WarnZones;
+    conductivity_zones?: WarnZones;
+    moisture_warn_auto?: boolean;
+    humidity_warn_auto?: boolean;
+    temperature_warn_auto?: boolean;
+    conductivity_warn_auto?: boolean;
     display_type?: DisplayType;
     hide_units?: boolean;      // Hide value/unit next to bars (default: false for full, true for compact)
     bars_per_row?: number;     // Number of bars per row: 1 or 2 (default: 2 for full, 1 for compact)

@@ -31,11 +31,11 @@ export const plantAttributes : DropdownOption[] = [
 ];
 
 export const careFields: DropdownOption[] = [
-  { label: 'Watering', value: 'care_watering' },
-  { label: 'Sunlight', value: 'care_sunlight' },
-  { label: 'Soil', value: 'care_soil' },
-  { label: 'Pruning', value: 'care_pruning' },
-  { label: 'Fertilization', value: 'care_fertilization' }
+  { label: 'Gießen', value: 'care_watering' },
+  { label: 'Lichtbedarf', value: 'care_sunlight' },
+  { label: 'Substrat', value: 'care_soil' },
+  { label: 'Rückschnitt', value: 'care_pruning' },
+  { label: 'Düngung', value: 'care_fertilization' }
 ];
 
 export const careIcons: Record<string, string> = {

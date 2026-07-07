@@ -3,7 +3,48 @@ import { TemplateResult, html } from "lit";
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { careFields, careIcons, default_show_bars } from "./constants";
 import { moreInfo } from "./utils";
+import { UNAVAILABLE_COLOR, resolveWarnZone, zoneColors, zoneIndex } from "./warnZones";
 import FlowerCard from "../flower-card";
+
+/** Half-width of the concave gap that marks the warn threshold, in px. */
+const WARN_TICK_HALF_GAP = 2.5;
+
+/**
+ * 4-zone meter: left pill, main bar, right pill — all colored uniformly by
+ * the current zone. The warn threshold is shown as a concave gap in the fill
+ * (two fill segments with convex rounded ends), only visible once the fill
+ * reaches the threshold.
+ */
+export const renderWarnZoneMeter = (
+    name: string,
+    available: boolean,
+    val: number,
+    min: number,
+    warn: number,
+    max: number,
+    fillPct: number,
+): TemplateResult => {
+    const colors = zoneColors(name);
+    const zi = zoneIndex(available, val, min, warn, max);
+    const barColor = zi >= 0 ? colors[zi] : UNAVAILABLE_COLOR;
+    const range = max - min;
+    // Tick position on the same linear min..max scale as fillPct; kept off the
+    // extreme edges so the gap never collides with the bar's rounded corners.
+    const tickPct = range > 0 ? Math.min(97, Math.max(3, ((warn - min) / range) * 100)) : 50;
+    const splitFill = fillPct > tickPct;
+
+    return html`
+            <div class="meter red">
+                <span style="display:block;height:100%;width:100%;background:${barColor};transition:background 0.3s;"></span>
+            </div>
+            <div class="meter green" style="position:relative;overflow:hidden;">
+                <span style="display:block;height:100%;width:${splitFill ? `calc(${tickPct}% - ${WARN_TICK_HALF_GAP}px)` : `${fillPct}%`};background:${barColor};position:absolute;left:0;top:0;transition:width 0.5s ease;${splitFill ? 'border-radius:0 2px 2px 0;' : ''}"></span>
+                <span style="display:block;height:100%;width:${splitFill ? `calc(${fillPct - tickPct}% - ${WARN_TICK_HALF_GAP}px)` : '0px'};background:${barColor};position:absolute;left:calc(${tickPct}% + ${WARN_TICK_HALF_GAP}px);top:0;transition:width 0.5s ease;border-radius:2px 0 0 2px;"></span>
+            </div>
+            <div class="meter red">
+                <span style="display:block;height:100%;width:${zi === 3 ? 100 : 0}%;background:${colors[3]};transition:background 0.3s;"></span>
+            </div>`;
+};
 
 export interface CareEntry {
     key: string;
@@ -316,7 +357,9 @@ export const renderAttribute = (card: FlowerCard, attr: DisplayedAttribute) => {
     const pct = useLinear
         ? 100 * Math.max(0, Math.min(1, (val - min) / (max - min)))
         : 100 * Math.max(0, Math.min(1, (Math.log(val) - Math.log(min)) / (Math.log(max) - Math.log(min))));
-    const toolTipText = aval ? `${attr.name}: ${val} ${unitTooltip}<br>(${min} ~ ${max} ${unitTooltip})` : card._hass.localize('state.default.unavailable');
+    const warnZone = resolveWarnZone(card.config, attr.name, min, max);
+    const warnTooltip = warnZone.enabled ? `<br>warn: ${warnZone.warn} ${unitTooltip}` : '';
+    const toolTipText = aval ? `${attr.name}: ${val} ${unitTooltip}<br>(${min} ~ ${max} ${unitTooltip})${warnTooltip}` : card._hass.localize('state.default.unavailable');
     const label = (attr.name === 'dli' || attr.name === 'dli_24h') ? '<math style="display: inline-grid;" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mfrac><mrow><mn>mol</mn></mrow><mrow><mn>d</mn><mn>⋅</mn><msup><mn>m</mn><mn>2</mn></msup></mrow></mfrac></mrow></math>' : unitTooltip
     // Determine settings with explicit overrides taking precedence over display_type defaults
     const isCompact = card.config?.display_type === DisplayType.Compact;
@@ -332,6 +375,7 @@ export const renderAttribute = (card: FlowerCard, attr: DisplayedAttribute) => {
         <div class="${attributeCssClass}" @click="${() => moreInfo(card, attr.sensor)}">
             <div class="tip" style="text-align:center;">${unsafeHTML(toolTipText)}</div>
             <ha-icon .icon="${icon}"></ha-icon>
+            ${warnZone.enabled ? renderWarnZoneMeter(attr.name, aval, val, min, warnZone.warn as number, max, aval ? pct : 0) : html`
             <div class="meter red">
                 <span class="${
                     aval ? (val < min || val > max ? "bad" : "good") : "unavailable"
@@ -346,7 +390,7 @@ export const renderAttribute = (card: FlowerCard, attr: DisplayedAttribute) => {
                 <span class="bad" style="width:${
                     aval ? (val > max ? 100 : 0) : "0"
                 }%;"></span>
-            </div>
+            </div>`}
             ${showUnits ? html`<div class="header"><span class="value">${display_val}</span>&nbsp;<span class='unit'>${unsafeHTML(label)}</span></div>` : ''}
         </div>
     `;

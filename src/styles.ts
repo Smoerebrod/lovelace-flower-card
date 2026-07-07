@@ -216,9 +216,22 @@ export const style = css`
 }
 .care-info {
   padding: 8px;
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 8px;
+}
+:host(.care-visible) .care-info {
+  display: flex;
+}
+/* Unicode ℹ instead of ha-icon: MDI does not load reliably in the Companion App. */
+#care-toggle {
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--primary-color);
+  margin-right: 6px;
+  line-height: 1;
+  user-select: none;
 }
 .care-item {
   display: flex;
