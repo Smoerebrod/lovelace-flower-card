@@ -253,4 +253,30 @@ export const style = css`
   line-height: 1.4;
   color: var(--secondary-text-color);
 }
+.care-info--dialog {
+  padding: 4px 4px 8px;
+}
+.care-info-empty {
+  padding: 8px 4px;
+  color: var(--secondary-text-color);
+}
+.has-lightbox {
+  cursor: pointer;
+}
+.image-dialog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.image-dialog img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+.image-dialog-caption {
+  margin-top: 8px;
+  text-align: center;
+  color: var(--primary-text-color);
+  font-weight: 500;
+}
 `;
