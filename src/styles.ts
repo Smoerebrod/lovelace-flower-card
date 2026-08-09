@@ -255,6 +255,10 @@ export const style = css`
 }
 .care-info--dialog {
   padding: 4px 4px 8px;
+  /* Fork: .care-info is display:none by default (toggled via :host(.care-visible)).
+     The dialog variant is not host-toggled, so it must restore display itself —
+     otherwise the care badge opens an empty dialog. */
+  display: flex;
 }
 .care-info-empty {
   padding: 8px 4px;

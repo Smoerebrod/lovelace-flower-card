@@ -73,8 +73,12 @@ Resolver wie der Balken).
 
 ## 4. Care Info Toggle (ℹ)
 
-- Unicode `ℹ` (U+2139) statt `ha-icon` — MDI lädt in der Companion App nicht
+- Unicode `ℹ` (U+2139) statt `ha-icon` — MDI lud in der Companion App nicht
   zuverlässig. Styling über `#care-toggle` in `src/styles.ts`.
+  ⚠️ **Zu überprüfen:** Die Karte nutzt `ha-icon` inzwischen an mehreren Stellen
+  (u. a. für die Care-Item-Icons im Inline-Block). Wenn diese in der Companion
+  App sauber rendern, ist die ursprüngliche Begründung überholt und der Patch
+  könnte zugunsten von `ha-icon` entfallen.
 - Icon erscheint **nur**, wenn `show_care` in der Card-Config nicht leer ist.
 - Sichtbarkeit über Host-Klasse `care-visible` (übersteht Lit-Re-Renders).
 - **Maus:** Hover zeigt/verbirgt (`pointerenter`/`pointerleave`,
@@ -91,6 +95,38 @@ show_care:
   - care_pruning
   - care_fertilization
 ```
+
+### ⚠️ Kollisionsgefahr: `.care-info` ist im Fork default-hidden
+
+Upstream rendert `.care-info` immer sichtbar. Dieser Fork setzt
+`display: none` und blendet nur über `:host(.care-visible)` ein.
+**Jede neue Upstream-Verwendung der Klasse `.care-info` außerhalb des
+Host-Toggles braucht daher ein eigenes `display`-Override.**
+
+Bereits betroffen: Upstreams Care-Badge (`extra_badges: - type: care_info`,
+seit v2026.7.0) rendert seinen Dialoginhalt als
+`<div class="care-info care-info--dialog">`. Ohne Override öffnet das Badge
+einen leeren Dialog. Behoben durch `display: flex` in `.care-info--dialog`
+(`src/styles.ts`). Der textuelle Merge war konfliktfrei — diese Kollision ist
+rein semantisch und wird von den Tests nicht erfasst. **Bei künftigen Merges
+gezielt auf neue `.care-info`-Vorkommen prüfen.**
+
+### Verhältnis zum Upstream-Care-Badge
+
+Beide Wege existieren parallel und schließen sich nicht aus:
+
+| | Fork (ℹ-Toggle) | Upstream (`care_info`-Badge) |
+|---|---|---|
+| Auslöser | `show_care` gesetzt | expliziter `extra_badges`-Eintrag |
+| Darstellung | Inline, eingeblendet | modaler `ha-dialog` |
+| Touch | Auto-Hide nach 5 s | bleibt bis zum Schließen offen |
+| Feldauswahl | = `show_care` | eigenes `fields` |
+
+Bewusste Entscheidung: **Der ℹ-Toggle bleibt.** Für den Kiosk-Betrieb
+(Flur-Tablet) ist das Auto-Hide funktional überlegen — ein modaler Dialog
+bliebe nach einem Tap im Vorbeigehen offen stehen. Eine spätere Migration auf
+das Upstream-Badge würde das Fork-Delta verkleinern und ist neu zu bewerten,
+falls sich der Nutzungskontext ändert.
 
 ## 5. Deutsche Labels
 
