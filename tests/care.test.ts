@@ -23,7 +23,9 @@ describe('selectCareInfo', () => {
     const result = selectCareInfo(attrs, ['care_watering', 'care_fertilization']);
     expect(result.map(e => e.key)).toEqual(['care_watering', 'care_fertilization']);
     expect(result[0].text).toBe('Water weekly.');
-    expect(result[0].label).toBe('Gießen');
+    expect(result[0].label).toBe('Watering');
+    // Fork: German labels follow the HA language (Gießen instead of upstream's Bewässerung)
+    expect(selectCareInfo(attrs, ['care_watering'], 'de')[0].label).toBe('Gießen');
     expect(result[0].icon).toBe('mdi:watering-can-outline');
   });
 

@@ -4,7 +4,7 @@ Dieser Fork erweitert die Flower Card um Warn-Zonen, ein Care-Info-Toggle und
 deutsche Labels. Diese Datei ist die kanonische Dokumentation der Abweichungen
 vom Upstream — sie wird im selben Commit gepflegt wie der Code.
 
-Basis: Upstream `v2026.6.1` (+ Dependency-Bumps von `main`).
+Basis: Upstream `v2026.11.2` (gemerged am 2026-11-06). Versionsschema: Upstream-Version + 4. Stelle (`2026.11.2.1`).
 
 ---
 
@@ -128,17 +128,33 @@ bliebe nach einem Tap im Vorbeigehen offen stehen. Eine spätere Migration auf
 das Upstream-Badge würde das Fork-Delta verkleinern und ist neu zu bewerten,
 falls sich der Nutzungskontext ändert.
 
-## 5. Deutsche Labels
+## 5. Deutsche Labels / Lokalisierung
 
-`careFields` in `src/utils/constants.ts`: Gießen, Lichtbedarf, Substrat,
-Rückschnitt, Düngung. „Soil Temperature" (Sensor-Feldname) bleibt unberührt.
-Editor-Sektion „Warn-Zonen" mit deutschen Toggle-Labels.
+Seit Upstream 2026.11 gibt es ein Lokalisierungssystem (`src/localize/`). Der Fork
+nutzt es, statt Labels hart zu codieren:
+
+- `de.json` überschreibt Upstreams Pflege-Labels: `care_watering` = Gießen,
+  `care_sunlight` = Lichtbedarf, `care_soil` = Substrat (Upstream: Bewässerung /
+  Sonnenlicht / Erde). Rückschnitt, Düngung unverändert.
+- Neue Schlüssel `settings_warn_zones`, `tooltip_warn` in `en.json` und `de.json`
+  (nl fällt auf en zurück).
+- Labels folgen der HA-Sprache (Englisch → „Watering“). **Bei Merges auf Konflikte in
+  `de.json` achten.**
 
 ## Tests
 
 `tests/warn-zones.test.ts` sichert die Semantik ab (Formel-Referenzwerte der
 Testpflanze, Präzedenz manuell > Toggle, Illuminance-Guard, Clamping,
 Zonen-Grenzen). `tests/care.test.ts` an deutsche Labels angepasst.
+
+## Plant Monitor (Bundling)
+
+Plant Monitor ≥ 2026.11 liefert eine eigene Kopie der Karte unter `/plant/flower-card.js`
+aus und meldet eine Reparatur-Warnung, wenn zusätzlich eine andere `flower-card.js` als
+Dashboard-Ressource existiert. Siehe Fork `Smoerebrod/homeassistant-plant`: dort ist
+`custom_components/plant/www/flower-card.js` durch den Build dieses Forks ersetzt.
+Die Upstream-Automation (`plant-update.yml`, `scripts/plant-pr.sh`, Release-Schritt
+„Update plant“) ist im Fork entfernt — sie würde PRs an Olens Plant-Repo öffnen.
 
 ## Deployment
 

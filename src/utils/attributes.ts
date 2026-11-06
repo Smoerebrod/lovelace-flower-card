@@ -1,8 +1,8 @@
 import { DisplayType, DisplayedAttribute, DisplayedAttributes, ExtraBadge, Limits } from "../types/flower-card-types";
 import { TemplateResult, html } from "lit";
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import { careFields, careIcons, default_show_bars } from "./constants";
-import { moreInfo } from "./utils";
+import { careFields, careIcons, default_show_bars, getCareFields } from "./constants";
+import { getHassLanguage, localize, localizeReading } from "../localize/localize";
+import { entityDisplayName, moreInfo } from "./utils";
 import { UNAVAILABLE_COLOR, resolveWarnZone, zoneColors, zoneIndex } from "./warnZones";
 import FlowerCard from "../flower-card";
 
@@ -58,9 +58,10 @@ export interface CareEntry {
 export const selectCareInfo = (
     attributes: Record<string, unknown> | undefined,
     showCare: string[] | undefined,
+    language = 'en',
 ): CareEntry[] => {
     if (!attributes || !showCare || showCare.length === 0) return [];
-    return careFields
+    return getCareFields(language)
         .filter(field => showCare.includes(field.value))
         .map(field => ({
             key: field.value,
@@ -90,7 +91,7 @@ export const renderCareInfo = (card: FlowerCard): TemplateResult => {
 
     const entity = config.entity;
     const attributes = entity ? card._hass.states[entity]?.attributes : undefined;
-    const entries = selectCareInfo(attributes, config.show_care);
+    const entries = selectCareInfo(attributes, config.show_care, getHassLanguage(card._hass));
     if (entries.length === 0) return html``;
 
     return html`
@@ -103,9 +104,6 @@ export const renderCareInfo = (card: FlowerCard): TemplateResult => {
 /** Discriminator value for the care-info badge (extra_badges: - type: care_info). */
 export const CARE_BADGE_TYPE = 'care_info';
 
-/** Default title for care dialog when badge title is undefined. */
-export const CARE_DIALOG_DEFAULT_TITLE = 'Care';
-
 /** True when an extra_badges item is the care-info badge. */
 export const isCareBadge = (badge: ExtraBadge): boolean => badge.type === CARE_BADGE_TYPE;
 
@@ -116,23 +114,25 @@ export const resolveCareBadgeFields = (badge: ExtraBadge): string[] =>
 /** Open-dialog state derived from a tapped care badge. */
 export const computeCareDialogState = (
     badge: ExtraBadge,
+    language = 'en',
 ): { open: boolean; fields: string[]; title: string } => ({
     open: true,
     fields: resolveCareBadgeFields(badge),
-    title: badge.title ?? CARE_DIALOG_DEFAULT_TITLE,
+    title: badge.title ?? localize({ language }, 'care'),
 });
 
 /** Badge icon/color/tooltip for a care badge, with defaults. */
 export const careBadgeVisual = (
     badge: ExtraBadge,
+    language = 'en',
 ): { icon: string; color: string; tip: string } => ({
     icon: badge.icon ?? 'mdi:sprout',
     color: badge.color ?? 'var(--secondary-text-color)',
-    tip: badge.title ?? CARE_DIALOG_DEFAULT_TITLE,
+    tip: badge.title ?? localize({ language }, 'care'),
 });
 
 export const renderCareBadge = (card: FlowerCard, badge: ExtraBadge): TemplateResult => {
-    const { icon, color, tip } = careBadgeVisual(badge);
+    const { icon, color, tip } = careBadgeVisual(badge, getHassLanguage(card._hass));
     return html`
         <div class="extra-badge tooltip" @click="${(e: Event) => { e.stopPropagation(); card.openCareDialog(badge); }}">
             <div class="tip" style="text-align:center;">${tip}</div>
@@ -245,7 +245,7 @@ export const renderExtraBadge = (card: FlowerCard, badge: ExtraBadge) => {
 
     const isBinarySensor = badgeEntity.startsWith('binary_sensor.');
     const state = entity.state;
-    const friendlyName = entity.attributes.friendly_name || badge.entity;
+    const friendlyName = entityDisplayName(card._hass, entity);
 
     // Determine icon - use provided icon, entity's custom icon, or derive from device_class
     let icon = badge.icon || entity.attributes.icon;
@@ -394,6 +394,8 @@ export const renderAttributes = (card: FlowerCard): TemplateResult[] => {
     return renderAttributeChunks(card, displayed);
 }
 
+const DLI_UNIT = html`<math style="display: inline-grid;" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mfrac><mrow><mn>mol</mn></mrow><mrow><mn>d</mn><mn>⋅</mn><msup><mn>m</mn><mn>2</mn></msup></mrow></mfrac></mrow></math>`;
+
 export const renderAttribute = (card: FlowerCard, attr: DisplayedAttribute) => {
     const { max, min } = attr.limits;
     const unitTooltip = attr.unit_of_measurement;
@@ -407,10 +409,13 @@ export const renderAttribute = (card: FlowerCard, attr: DisplayedAttribute) => {
     const pct = useLinear
         ? 100 * Math.max(0, Math.min(1, (val - min) / (max - min)))
         : 100 * Math.max(0, Math.min(1, (Math.log(val) - Math.log(min)) / (Math.log(max) - Math.log(min))));
+    const translatedName = localizeReading(card._hass, attr.name);
     const warnZone = resolveWarnZone(card.config, attr.name, min, max);
-    const warnTooltip = warnZone.enabled ? `<br>warn: ${warnZone.warn} ${unitTooltip}` : '';
-    const toolTipText = aval ? `${attr.name}: ${val} ${unitTooltip}<br>(${min} ~ ${max} ${unitTooltip})${warnTooltip}` : card._hass.localize('state.default.unavailable');
-    const label = (attr.name === 'dli' || attr.name === 'dli_24h') ? '<math style="display: inline-grid;" xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mfrac><mrow><mn>mol</mn></mrow><mrow><mn>d</mn><mn>⋅</mn><msup><mn>m</mn><mn>2</mn></msup></mrow></mfrac></mrow></math>' : unitTooltip
+    const warnTooltip = warnZone.enabled ? html`<br>${localize(card._hass, 'tooltip_warn')}: ${warnZone.warn} ${unitTooltip}` : '';
+    const toolTip = aval
+        ? html`${translatedName}: ${val} ${unitTooltip}<br>(${min} ~ ${max} ${unitTooltip})${warnTooltip}`
+        : card._hass.localize('state.default.unavailable');
+    const label = (attr.name === 'dli' || attr.name === 'dli_24h') ? DLI_UNIT : unitTooltip;
     // Determine settings with explicit overrides taking precedence over display_type defaults
     const isCompact = card.config?.display_type === DisplayType.Compact;
     const barsPerRow = card.config?.bars_per_row ?? (isCompact ? 1 : 2);
@@ -423,7 +428,7 @@ export const renderAttribute = (card: FlowerCard, attr: DisplayedAttribute) => {
 
     return html`
         <div class="${attributeCssClass}" @click="${() => moreInfo(card, attr.sensor)}">
-            <div class="tip" style="text-align:center;">${unsafeHTML(toolTipText)}</div>
+            <div class="tip" style="text-align:center;">${toolTip}</div>
             <ha-icon .icon="${icon}"></ha-icon>
             ${warnZone.enabled ? renderWarnZoneMeter(attr.name, aval, val, min, warnZone.warn as number, max, aval ? pct : 0) : html`
             <div class="meter red">
@@ -441,7 +446,7 @@ export const renderAttribute = (card: FlowerCard, attr: DisplayedAttribute) => {
                     aval ? (val > max ? 100 : 0) : "0"
                 }%;"></span>
             </div>`}
-            ${showUnits ? html`<div class="header"><span class="value">${display_val}</span>&nbsp;<span class='unit'>${unsafeHTML(label)}</span></div>` : ''}
+            ${showUnits ? html`<div class="header"><span class="value">${display_val}</span>&nbsp;<span class='unit'>${label}</span></div>` : ''}
         </div>
     `;
 };

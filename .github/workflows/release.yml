@@ -15,8 +15,11 @@ jobs:
   release:
     name: "Create Release"
     runs-on: "ubuntu-latest"
-    # Only run if Test & Lint succeeded
-    if: github.event.workflow_run.conclusion == 'success'
+    # Only after Test & Lint succeeds on a push to this repository (a fork's branch can also be named main)
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     steps:
       - name: "✏️ Checkout code"
         uses: actions/checkout@v7
@@ -58,7 +61,7 @@ jobs:
       - name: "📦 Setup Node.js"
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
         if: steps.check_package.outputs.changed == 'true' && steps.check_tag.outputs.exists != 'true'
 
@@ -94,7 +97,8 @@ jobs:
 
           [skip ci]" \
             --base main \
-            --head "$BRANCH_NAME"
+            --head "$BRANCH_NAME" \
+            --label release
           gh pr merge "$BRANCH_NAME" --merge --admin --delete-branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -122,6 +126,7 @@ jobs:
           files: |
             flower-card.js
             flower-card.js.gz
+            flower-card.js.LICENSE.txt
         if: steps.check_package.outputs.changed == 'true' && steps.check_tag.outputs.exists != 'true' && contains(env.COMPONENT_VERSION, 'beta') == false
 
       - name: "🤞 Create Beta release"
@@ -134,4 +139,5 @@ jobs:
           files: |
             flower-card.js
             flower-card.js.gz
+            flower-card.js.LICENSE.txt
         if: steps.check_package.outputs.changed == 'true' && steps.check_tag.outputs.exists != 'true' && contains(env.COMPONENT_VERSION, 'beta') == true
