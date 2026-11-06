@@ -1,18 +1,31 @@
 import { CSSResult, HTMLTemplateResult, LitElement, html } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { property, state } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
 import { style } from './styles';
 import { DisplayType, EntitySuggestion, ExtraBadge, FlowerCardConfig, HomeAssistantEntity, PlantInfo } from './types/flower-card-types';
 import * as packageJson from '../package.json';
-import { CARE_DIALOG_DEFAULT_TITLE, computeCareDialogState, renderAttributes, renderBattery, renderCareInfo, renderCareItems, renderExtraBadges, selectCareInfo } from './utils/attributes';
-import { CARD_NAME, careFields, default_show_bars, missingImage, plantAttributes } from './utils/constants';
-import { isMediaSourceUrl, moreInfo, resolveMediaSource, shouldEnableImageLightbox } from './utils/utils';
+import { computeCareDialogState, renderAttributes, renderBattery, renderCareInfo, renderCareItems, renderExtraBadges, selectCareInfo } from './utils/attributes';
+import { CARD_NAME, default_show_bars, getCareFields, getPlantAttributes, missingImage } from './utils/constants';
+import { getHassLanguage, localize } from './localize/localize';
+import { entityDisplayName, isMediaSourceUrl, moreInfo, nameSelector, resolveMediaSource, shouldEnableImageLightbox } from './utils/utils';
 
 console.info(
     `%c FLOWER-CARD %c ${packageJson.version}`,
     'color: cyan; background: black; font-weight: bold;',
     'color: darkblue; background: white; font-weight: bold;'
 );
+
+const getConfigFormLanguage = (): string => {
+    if (typeof document === 'undefined') return 'en';
+    return document.documentElement?.lang || 'en';
+};
+
+// getConfigForm is static, so it has no hass of its own; read the version from the page
+const getHaVersion = (): string | undefined => {
+    if (typeof document === 'undefined') return undefined;
+    const root = document.querySelector('home-assistant') as (Element & { hass?: HomeAssistant }) | null;
+    return root?.hass?.config?.version;
+};
 
 // Suggests flower-card in Home Assistant's card picker when a plant entity is
 // selected (HA 2026.6+). Returns null for any non-plant entity so the card only
@@ -30,22 +43,25 @@ export const getEntitySuggestion = (hass: HomeAssistant, entityId: string): Enti
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 (window as any).customCards = (window as any).customCards || [];
-(window as any).customCards.push({
-    type: CARD_NAME,
-    name: 'Flower card',
-    preview: true,
-    description: 'Custom flower card for https://github.com/Olen/homeassistant-plant',
-    getEntitySuggestion,
-});
-/* eslint-disable @typescript-eslint/no-explicit-any */
+const alreadyListed = (window as any).customCards.some((card: { type: string }) => card.type === CARD_NAME);
+if (!alreadyListed) {
+    (window as any).customCards.push({
+        type: CARD_NAME,
+        name: 'Flower card',
+        preview: true,
+        description: 'Custom flower card for https://github.com/Olen/homeassistant-plant',
+        getEntitySuggestion,
+    });
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
-@customElement(CARD_NAME)
 export default class FlowerCard extends LitElement {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     @property() _hass?: any;
     @property() config?: FlowerCardConfig;
     @state() private _careDialogOpen = false;
     @state() private _careDialogFields: string[] = [];
-    @state() private _careDialogTitle = CARE_DIALOG_DEFAULT_TITLE;
+    @state() private _careDialogTitle = '';
     @state() private _imageDialogOpen = false;
 
     private stateObj: HomeAssistantEntity | undefined;
@@ -122,6 +138,7 @@ export default class FlowerCard extends LitElement {
     }
 
     static getConfigForm() {
+        const language = getConfigFormLanguage();
         return {
             schema: [
                 {
@@ -129,10 +146,7 @@ export default class FlowerCard extends LitElement {
                     required: true,
                     selector: { entity: { domain: "plant" } }
                 },
-                {
-                    name: "name",
-                    selector: { text: {} }
-                },
+                nameSelector(getHaVersion()),
                 {
                     name: "battery_sensor",
                     selector: { entity: { domain: "sensor", device_class: "battery" } }
@@ -140,14 +154,14 @@ export default class FlowerCard extends LitElement {
                 {
                     type: "expandable",
                     name: "",
-                    title: "Bars",
+                    title: localize({ language }, 'settings_bars'),
                     schema: [
                         {
                             name: "show_bars",
                             selector: {
                                 select: {
                                     multiple: true,
-                                    options: plantAttributes
+                                    options: getPlantAttributes(language)
                                 }
                             }
                         }
@@ -156,14 +170,14 @@ export default class FlowerCard extends LitElement {
                 {
                     type: "expandable",
                     name: "",
-                    title: "Care Info",
+                    title: localize({ language }, 'settings_care_info'),
                     schema: [
                         {
                             name: "show_care",
                             selector: {
                                 select: {
                                     multiple: true,
-                                    options: careFields
+                                    options: getCareFields(language)
                                 }
                             }
                         }
@@ -172,7 +186,7 @@ export default class FlowerCard extends LitElement {
                 {
                     type: "expandable",
                     name: "",
-                    title: "Warn-Zonen",
+                    title: localize({ language }, 'settings_warn_zones'),
                     schema: [
                         { name: "moisture_warn_auto", selector: { boolean: {} } },
                         { name: "humidity_warn_auto", selector: { boolean: {} } },
@@ -183,15 +197,15 @@ export default class FlowerCard extends LitElement {
                 {
                     type: "expandable",
                     name: "",
-                    title: "Appearance",
+                    title: localize({ language }, 'settings_appearance'),
                     schema: [
                         {
                             name: "display_type",
                             selector: {
                                 select: {
                                     options: [
-                                        { value: "full", label: "Full" },
-                                        { value: "compact", label: "Compact" }
+                                        { value: "full", label: localize({ language }, 'settings_full') },
+                                        { value: "compact", label: localize({ language }, 'settings_compact') }
                                     ]
                                 }
                             }
@@ -213,19 +227,19 @@ export default class FlowerCard extends LitElement {
             ],
             computeLabel: (schema: { name: string }) => {
                 const labels: Record<string, string> = {
-                    entity: "Entity",
-                    name: "Display Name",
-                    display_type: "Display Type",
-                    battery_sensor: "Battery Sensor",
-                    show_bars: "Show Bars",
-                    show_care: "Show Care Info",
-                    hide_species: "Hide Species",
-                    hide_image: "Hide Image",
-                    hide_units: "Hide Units",
-                    moisture_warn_auto: "Bodenfeuchtigkeit",
-                    humidity_warn_auto: "Luftfeuchtigkeit",
-                    temperature_warn_auto: "Temperatur",
-                    conductivity_warn_auto: "EC / Leitfähigkeit"
+                    entity: localize({ language }, 'settings_entity'),
+                    name: localize({ language }, 'settings_display_name'),
+                    display_type: localize({ language }, 'settings_display_type'),
+                    battery_sensor: localize({ language }, 'settings_battery_sensor'),
+                    show_bars: localize({ language }, 'settings_show_bars'),
+                    show_care: localize({ language }, 'settings_show_care_info'),
+                    hide_species: localize({ language }, 'settings_hide_species'),
+                    hide_image: localize({ language }, 'settings_hide_image'),
+                    hide_units: localize({ language }, 'settings_hide_units'),
+                    moisture_warn_auto: localize({ language }, 'moisture'),
+                    humidity_warn_auto: localize({ language }, 'humidity'),
+                    temperature_warn_auto: localize({ language }, 'temperature'),
+                    conductivity_warn_auto: localize({ language }, 'conductivity')
                 };
                 return labels[schema.name] || schema.name;
             }
@@ -264,7 +278,7 @@ export default class FlowerCard extends LitElement {
     }
 
     openCareDialog(badge: ExtraBadge): void {
-        const { open, fields, title } = computeCareDialogState(badge);
+        const { open, fields, title } = computeCareDialogState(badge, getHassLanguage(this._hass));
         this._careDialogFields = fields;
         this._careDialogTitle = title;
         this._careDialogOpen = open;
@@ -277,12 +291,19 @@ export default class FlowerCard extends LitElement {
     private renderCareDialog(): HTMLTemplateResult {
         const entity = this.config?.entity;
         const attributes = entity ? this._hass?.states[entity]?.attributes : undefined;
-        const entries = selectCareInfo(attributes, this._careDialogFields);
+        const language = getHassLanguage(this._hass);
+        const entries = selectCareInfo(attributes, this._careDialogFields, language);
+        // ha-dialog takes its title from header-title; older HA read heading
         return html`
-            <ha-dialog open heading="${this._careDialogTitle}" @closed="${() => this._closeCareDialog()}">
+            <ha-dialog
+                open
+                header-title="${this._careDialogTitle}"
+                heading="${this._careDialogTitle}"
+                @closed="${() => this._closeCareDialog()}"
+            >
                 ${entries.length > 0
                     ? html`<div class="care-info care-info--dialog">${renderCareItems(entries)}</div>`
-                    : html`<div class="care-info-empty">No care information available.</div>`}
+                    : html`<div class="care-info-empty">${localize({ language }, 'no_care_info')}</div>`}
             </ha-dialog>
         `;
     }
@@ -296,7 +317,7 @@ export default class FlowerCard extends LitElement {
     }
 
     private renderImageDialog(): HTMLTemplateResult {
-        const displayName = this.config?.name || this.stateObj?.attributes.friendly_name || '';
+        const displayName = this.stateObj ? entityDisplayName(this._hass, this.stateObj, this.config?.name) : '';
         return html`
             <ha-dialog open @closed="${() => this._closeImageDialog()}">
                 <div class="image-dialog">
@@ -322,7 +343,7 @@ export default class FlowerCard extends LitElement {
         const stateObj = this.stateObj;
 
         const species = stateObj.attributes.species;
-        const displayName = this.config.name || stateObj.attributes.friendly_name;
+        const displayName = entityDisplayName(this._hass, stateObj, this.config.name);
         const hideSpecies = this.config.hide_species ?? false;
         const hideImage = this.config.hide_image ?? false;
         const imageLightbox = shouldEnableImageLightbox(hideImage, this._resolvedImageUrl);
@@ -383,4 +404,9 @@ export default class FlowerCard extends LitElement {
     static get styles(): CSSResult {
         return style;
     }
+}
+
+// Plant serves its own copy, so another copy may already have defined the card
+if (!customElements.get(CARD_NAME)) {
+    customElements.define(CARD_NAME, FlowerCard);
 }
